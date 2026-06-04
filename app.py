@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# LOAD MODELS
+# LOAD MODEL
 @st.cache_resource
 def load_model():
     return whisper.load_model("base")
@@ -20,6 +20,22 @@ model = load_model()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 g_model = genai.GenerativeModel("gemini-2.5-flash")
+
+# -----------------------------
+# SAFE TRIM FUNCTION (FIX)
+# -----------------------------
+def trim_text(text, max_chars=8000):
+    if len(text) <= max_chars:
+        return text
+
+    cut = text[:max_chars]
+    last_dot = cut.rfind(".")
+
+    if last_dot == -1:
+        return cut
+
+    return cut[:last_dot + 1]
+
 
 # SIDEBAR
 with st.sidebar:
@@ -71,8 +87,7 @@ if uploaded_file is not None:
             if key.startswith("q_"):
                 del st.session_state[key]
 
-    # ✅ SAFE FILE NAME (FIXED)
-    file_path = "temp_audio.mp3"
+    file_path = "temp_audio.wav"
 
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
@@ -98,7 +113,10 @@ def safe_parse_quiz(text):
     except:
         return None
 
-# AI FUNCTIONS
+# -----------------------------
+# AI FUNCTIONS (FIXED)
+# -----------------------------
+
 def summarize(text):
     prompt = f"""
 Convert this lecture into:
@@ -109,7 +127,7 @@ Convert this lecture into:
 Lecture:
 {text}
 """
-    return g_model.generate_content(prompt).text
+    return g_model.generate_content(trim_text(prompt)).text
 
 
 def generate_quiz(text):
@@ -121,24 +139,10 @@ Return ONLY valid JSON.
 IMPORTANT:
 - "answer" must contain FULL correct option text
 
-Example:
-[
-  {{
-    "question": "What is AI?",
-    "options": [
-      "Artificial Intelligence",
-      "Machine Learning",
-      "Database",
-      "Compiler"
-    ],
-    "answer": "Artificial Intelligence"
-  }}
-]
-
 Lecture:
 {text}
 """
-    return g_model.generate_content(prompt).text
+    return g_model.generate_content(trim_text(prompt)).text
 
 
 def ask_question(question, transcript):
@@ -156,7 +160,8 @@ Lecture:
 Question:
 {question}
 """
-    return g_model.generate_content(prompt).text
+    return g_model.generate_content(trim_text(prompt)).text
+
 
 # TABS
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -172,7 +177,10 @@ with tab1:
         if st.session_state.transcript is None and file_path:
             with st.spinner("🎤 Transcribing lecture..."):
                 result = model.transcribe(file_path)
-                st.session_state.transcript = result["text"]
+
+                # LIMIT TRANSCRIPT (IMPORTANT FIX)
+                st.session_state.transcript = result["text"][:10000]
+
         else:
             st.info("Transcript already generated ✅")
 
@@ -289,10 +297,9 @@ col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
     if st.button("🔄 Reset App", use_container_width=True):
-
         st.session_state.clear()
 
-        for f in ["temp_audio.mp3", "audio.mp3", "audio.wav"]:
+        for f in ["temp_audio.wav", "audio.mp3", "audio.wav"]:
             if os.path.exists(f):
                 os.remove(f)
 
