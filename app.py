@@ -19,12 +19,12 @@ def load_model():
 model = load_model()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-g_model = genai.GenerativeModel("gemini-2.5-flash")
+g_model = genai.GenerativeModel("gemini-1.5-flash")  # 🔥 faster model
 
 # -----------------------------
-# SAFE TRIM FUNCTION (FIX)
+# SAFE TRIM FUNCTION
 # -----------------------------
-def trim_text(text, max_chars=8000):
+def trim_text(text, max_chars=7000):
     if len(text) <= max_chars:
         return text
 
@@ -35,7 +35,6 @@ def trim_text(text, max_chars=8000):
         return cut
 
     return cut[:last_dot + 1]
-
 
 # SIDEBAR
 with st.sidebar:
@@ -114,44 +113,49 @@ def safe_parse_quiz(text):
         return None
 
 # -----------------------------
-# AI FUNCTIONS (FIXED)
+# AI FUNCTIONS (FIXED PROPERLY)
 # -----------------------------
 
 def summarize(text):
+    text = trim_text(text)
+
     prompt = f"""
 Convert this lecture into:
 1. Simple Notes
 2. Key Points
 3. Short Summary
 
+Keep response concise.
+
 Lecture:
 {text}
 """
-    return g_model.generate_content(trim_text(prompt)).text
+    return g_model.generate_content(prompt).text
 
 
 def generate_quiz(text):
+    text = trim_text(text)
+
     prompt = f"""
 Create 5 MCQs from this lecture.
 
 Return ONLY valid JSON.
 
-IMPORTANT:
-- "answer" must contain FULL correct option text
-
 Lecture:
 {text}
 """
-    return g_model.generate_content(trim_text(prompt)).text
+    return g_model.generate_content(prompt).text
 
 
 def ask_question(question, transcript):
+    transcript = trim_text(transcript)
+
     prompt = f"""
 You are an AI tutor.
 
 Answer ONLY using the lecture transcript.
 
-If answer not present:
+If not found:
 "Answer not found in lecture."
 
 Lecture:
@@ -160,8 +164,7 @@ Lecture:
 Question:
 {question}
 """
-    return g_model.generate_content(trim_text(prompt)).text
-
+    return g_model.generate_content(prompt).text
 
 # TABS
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -178,8 +181,8 @@ with tab1:
             with st.spinner("🎤 Transcribing lecture..."):
                 result = model.transcribe(file_path)
 
-                # LIMIT TRANSCRIPT (IMPORTANT FIX)
-                st.session_state.transcript = result["text"][:10000]
+                # LIMIT TRANSCRIPT
+                st.session_state.transcript = result["text"][:8000]
 
         else:
             st.info("Transcript already generated ✅")
