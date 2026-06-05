@@ -14,21 +14,24 @@ st.set_page_config(
 # LOAD MODEL
 @st.cache_resource
 def load_model():
-    return whisper.load_model("base")
+    return whisper.load_model("tiny")  
 
 model = load_model()
 
+# GEMINI SETUP
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-g_model = genai.GenerativeModel("gemini-1.5-flash")  # 🔥 faster model
+g_model = genai.GenerativeModel("gemini-2.5-flash")
 
-# -----------------------------
-# SAFE TRIM FUNCTION
-# -----------------------------
-def trim_text(text, max_chars=7000):
+
+# SAFE TEXT LIMIT
+
+def trim_text(text, max_chars=4000):
+
     if len(text) <= max_chars:
         return text
 
     cut = text[:max_chars]
+
     last_dot = cut.rfind(".")
 
     if last_dot == -1:
@@ -36,9 +39,13 @@ def trim_text(text, max_chars=7000):
 
     return cut[:last_dot + 1]
 
+
 # SIDEBAR
+
 with st.sidebar:
+
     st.header("📚 AI Lecture Assistant")
+
     st.write("""
     ### Features
     - 🎤 Speech to Text
@@ -46,10 +53,14 @@ with st.sidebar:
     - 🎯 AI Quiz
     - 💬 AI Tutor
     """)
+
     st.write("---")
+
     st.info("Upload lecture audio to begin.")
 
+
 # TITLE
+
 st.markdown(
     "<h1 style='text-align:center;'>📚 AI Lecture Assistant</h1>",
     unsafe_allow_html=True
@@ -57,18 +68,31 @@ st.markdown(
 
 st.write("")
 
+
 # FILE UPLOADER
+
 uploaded_file = st.file_uploader(
     "Upload audio (mp3/wav)",
     type=["mp3", "wav"]
 )
 
-# SESSION INIT
-for key in ["transcript", "summary", "quiz", "file_name", "chat_answer", "submitted"]:
+
+# SESSION STATE
+
+for key in [
+    "transcript",
+    "summary",
+    "quiz",
+    "file_name",
+    "chat_answer",
+    "submitted"
+]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "submitted" else False
 
-# SAFE FILE HANDLING
+
+# FILE HANDLING
+
 file_path = None
 
 if uploaded_file is not None:
@@ -97,10 +121,15 @@ if uploaded_file is not None:
 
     st.success("✅ File uploaded successfully!")
 
+
 # QUIZ PARSER
+
 def safe_parse_quiz(text):
+
     try:
-        text = text.replace("```json", "").replace("```", "").strip()
+        text = text.replace("```json", "")
+        text = text.replace("```", "").strip()
+
         start = text.find("[")
         end = text.rfind("]") + 1
 
@@ -112,15 +141,18 @@ def safe_parse_quiz(text):
     except:
         return None
 
-# -----------------------------
-# AI FUNCTIONS (FIXED PROPERLY)
-# -----------------------------
+
+# AI FUNCTIONS
 
 def summarize(text):
-    text = trim_text(text)
 
-    prompt = f"""
+    try:
+
+        text = trim_text(text)
+
+        prompt = f"""
 Convert this lecture into:
+
 1. Simple Notes
 2. Key Points
 3. Short Summary
@@ -130,32 +162,63 @@ Keep response concise.
 Lecture:
 {text}
 """
-    return g_model.generate_content(prompt).text
+
+        return g_model.generate_content(prompt).text
+
+    except Exception as e:
+
+        return f"❌ Error generating notes:\n\n{e}"
 
 
 def generate_quiz(text):
-    text = trim_text(text)
 
-    prompt = f"""
+    try:
+
+        text = trim_text(text)
+
+        prompt = f"""
 Create 5 MCQs from this lecture.
 
 Return ONLY valid JSON.
 
+Format:
+
+[
+  {{
+    "question": "Question here",
+    "options": [
+      "Option 1",
+      "Option 2",
+      "Option 3",
+      "Option 4"
+    ],
+    "answer": "Correct option"
+  }}
+]
+
 Lecture:
 {text}
 """
-    return g_model.generate_content(prompt).text
+
+        return g_model.generate_content(prompt).text
+
+    except Exception as e:
+
+        return f"❌ Error generating quiz:\n\n{e}"
 
 
 def ask_question(question, transcript):
-    transcript = trim_text(transcript)
 
-    prompt = f"""
+    try:
+
+        transcript = trim_text(transcript)
+
+        prompt = f"""
 You are an AI tutor.
 
 Answer ONLY using the lecture transcript.
 
-If not found:
+If answer not found:
 "Answer not found in lecture."
 
 Lecture:
@@ -164,9 +227,16 @@ Lecture:
 Question:
 {question}
 """
-    return g_model.generate_content(prompt).text
+
+        return g_model.generate_content(prompt).text
+
+    except Exception as e:
+
+        return f"❌ Error generating answer:\n\n{e}"
+
 
 # TABS
+
 tab1, tab2, tab3, tab4 = st.tabs([
     "📝 Transcript",
     "📚 AI Notes",
@@ -174,37 +244,64 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🤖 AI Tutor"
 ])
 
-# TAB 1
-with tab1:
-    if st.button("Generate Transcript"):
-        if st.session_state.transcript is None and file_path:
-            with st.spinner("🎤 Transcribing lecture..."):
-                result = model.transcribe(file_path)
 
-                # LIMIT TRANSCRIPT
-                st.session_state.transcript = result["text"][:8000]
+# TAB 1 — TRANSCRIPT
+
+with tab1:
+
+    if st.button("Generate Transcript"):
+
+        if st.session_state.transcript is None:
+
+            if file_path:
+
+                with st.spinner("🎤 Transcribing lecture..."):
+
+                    result = model.transcribe(file_path)
+
+                    # LIMIT TRANSCRIPT
+                    st.session_state.transcript = result["text"][:5000]
 
         else:
             st.info("Transcript already generated ✅")
 
     if st.session_state.transcript:
+
         st.success("✅ Transcript Generated")
+
         with st.expander("View Transcript"):
+
             st.write(st.session_state.transcript)
 
-# TAB 2
+
+# TAB 2 — NOTES
+
 with tab2:
+
     if st.button("Generate Notes"):
+
         if st.session_state.summary is None:
+
             if st.session_state.transcript:
+
                 with st.spinner("📚 Generating AI notes..."):
-                    st.session_state.summary = summarize(st.session_state.transcript)
+
+                    st.session_state.summary = summarize(
+                        st.session_state.transcript
+                    )
+
             else:
                 st.warning("Generate transcript first!")
 
+        else:
+            st.info("Notes already generated ✅")
+
     if st.session_state.summary:
+
         st.success("✅ Notes Generated")
+
         with st.expander("View Notes"):
+
             st.write(st.session_state.summary)
 
         st.download_button(
@@ -213,25 +310,47 @@ with tab2:
             file_name="lecture_notes.txt"
         )
 
-# TAB 3
+
+# TAB 3 — QUIZ
+
 with tab3:
+
     if st.button("Generate Quiz"):
+
         if st.session_state.quiz is None:
+
             if st.session_state.transcript:
+
                 with st.spinner("🎯 Generating quiz..."):
-                    st.session_state.quiz = generate_quiz(st.session_state.transcript)
+
+                    st.session_state.quiz = generate_quiz(
+                        st.session_state.transcript
+                    )
+
             else:
                 st.warning("Generate transcript first!")
 
+        else:
+            st.info("Quiz already generated ✅")
+
     if st.session_state.quiz:
+
         quiz_data = safe_parse_quiz(st.session_state.quiz)
 
-        if quiz_data:
+        if quiz_data is None:
+
+            st.error("❌ Quiz format error")
+
+        else:
+
             st.write("## 🎯 Quiz")
 
             if not st.session_state.submitted:
+
                 for i, q in enumerate(quiz_data):
+
                     st.write(f"### Q{i+1}: {q['question']}")
+
                     st.radio(
                         "Choose your answer",
                         q["options"],
@@ -240,75 +359,116 @@ with tab3:
                     )
 
                 if st.button("📊 Submit Quiz"):
+
                     st.session_state.submitted = True
                     st.rerun()
 
             else:
+
                 score = 0
 
                 for i, q in enumerate(quiz_data):
-                    user_ans = st.session_state.get(f"q_{i}_{st.session_state.file_name}")
+
+                    user_ans = st.session_state.get(
+                        f"q_{i}_{st.session_state.file_name}"
+                    )
+
                     correct_ans = q["answer"]
 
                     st.write(f"### Q{i+1}: {q['question']}")
 
                     for option in q["options"]:
+
                         if option == correct_ans:
                             st.success(option)
+
                         elif option == user_ans:
                             st.error(option)
+
                         else:
                             st.write(option)
 
                     if user_ans == correct_ans:
                         score += 1
 
-                st.subheader(f"🏆 Final Score: {score} / {len(quiz_data)}")
+                st.write("---")
+
+                st.subheader(
+                    f"🏆 Final Score: {score} / {len(quiz_data)}"
+                )
 
                 if st.button("🔄 Retry Quiz"):
+
                     st.session_state.submitted = False
+
                     for key in list(st.session_state.keys()):
+
                         if key.startswith("q_"):
                             del st.session_state[key]
+
                     st.rerun()
 
-# TAB 4
+
+# TAB 4 — AI TUTOR
+
 with tab4:
+
     st.write("## 🤖 Ask Questions from Lecture")
 
     if st.session_state.transcript:
-        user_question = st.text_input("Ask something about the lecture")
+
+        user_question = st.text_input(
+            "Ask something about the lecture"
+        )
 
         if st.button("Ask AI"):
-            if user_question.strip():
+
+            if user_question.strip() != "":
+
                 with st.spinner("🤖 Thinking..."):
+
                     st.session_state.chat_answer = ask_question(
                         user_question,
                         st.session_state.transcript
                     )
 
         if st.session_state.chat_answer:
+
             st.success("✅ Answer Generated")
+
             st.write(st.session_state.chat_answer)
+
     else:
         st.warning("Generate transcript first!")
 
-# RESET
+
+# RESET BUTTON
+
+st.write("")
+st.write("")
 st.write("---")
 
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
+
     if st.button("🔄 Reset App", use_container_width=True):
+
         st.session_state.clear()
 
-        for f in ["temp_audio.wav", "audio.mp3", "audio.wav"]:
+        for f in [
+            "temp_audio.wav",
+            "audio.mp3",
+            "audio.wav"
+        ]:
             if os.path.exists(f):
                 os.remove(f)
 
         st.rerun()
 
+
 # FOOTER
+
 st.markdown(
     """
     <style>
