@@ -1,6 +1,6 @@
 📚 AI Lecture Assistant
 
-An AI-powered Streamlit web application that converts lecture audio into **transcripts, structured notes, quizzes, and an interactive AI tutor** using Whisper and Google Gemini API.
+An AI-powered Streamlit web application that converts lecture audio into transcripts, structured notes, quizzes, and an interactive AI tutor using Whisper and Google Gemini API.
 
 
 🚀 Live Features
@@ -26,7 +26,7 @@ An AI-powered Streamlit web application that converts lecture audio into **trans
 ⚙️ Installation & Setup
 
 1. Clone the repository
-git clone https://github.com/your-username/ai-lecture-assistant.git
+git clone https://github.com/hinduja2006/ai-lecture-assistant.git
 cd ai-lecture-assistant
 
 2. Install dependencies
