@@ -341,6 +341,8 @@ with tab3:
 
             st.error("❌ Quiz format error")
 
+            st.write(st.session_state.quiz)
+
         else:
 
             st.write("## 🎯 Quiz")
@@ -352,13 +354,19 @@ with tab3:
                     st.write(f"### Q{i+1}: {q['question']}")
 
                     st.radio(
-                        "Choose your answer",
+                        f"Choose your answer for Q{i+1}",
                         q["options"],
                         index=None,
                         key=f"q_{i}_{st.session_state.file_name}"
                     )
 
-                if st.button("📊 Submit Quiz"):
+                # SUBMIT BUTTON
+                st.write("")
+
+                if st.button(
+                    "📊 Submit Quiz",
+                    use_container_width=True
+                ):
 
                     st.session_state.submitted = True
                     st.rerun()
